@@ -19,6 +19,9 @@ Test with SQL server 2019
 by Apache JMeter with 10 threads each thread loop 10 times
 to send multiple recharge requests the same wallet at the same time.
 
+This test is an extreme case and not reflect any real world usage!
+How can one of users recharge their wallet at this rate (> 10/s)?
+
 | Concurrency Control Type | DbUpdateException handler | Retry | Success rate | Throughput |
 |--------------------------|---------------------------|-------|-------------:|----------:|
 |Optimistic                | N                         | N/A   | 50%          | 20.2/s    |
