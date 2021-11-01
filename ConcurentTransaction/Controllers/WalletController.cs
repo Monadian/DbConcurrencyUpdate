@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore.ChangeTracking;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using static ConcurentTransaction.Helper;
 
 namespace CocurentTransaction.Controllers
 {
@@ -15,7 +16,7 @@ namespace CocurentTransaction.Controllers
     public class WalletController : ControllerBase
     {
         private readonly WalletContext walletContext;
-        private static readonly Random random = new();
+        
 
         public WalletController(WalletContext walletContext)
         {
@@ -29,40 +30,20 @@ namespace CocurentTransaction.Controllers
             {
                 // 1. Let's try to update record with optimisic concurrency check to avoid performance penalty and deadlock
                 // this line check for concurrency update and do conflict handle without retry
-                //var newBalance = await RechargeCoreAsync();
+                var newBalanceType1 = await RechargeCoreAsync();
 
                 // 2. Same as (1) but with retry
                 // We try to update for 5 times (with delay), if it still conflicted just admit it.
-                //var newBalance = await TryConcurrentUpdateAsync(
-                //    5,
-                //    1000,
-                //    async () => await RechargeCoreAsync());
+                //var newBalanceType2 = await RechargeCoreAsync(true);
 
                 // 3. Use DB row-lock
-                var newBalance = await UseRowLockTransactionAsync(RechargeCoreAsync);
+                //var newBalanceType3 = await UseRowLockTransactionAsync(() => RechargeCoreAsync());
 
-                return Ok(newBalance);
+                return Ok(newBalanceType1);
             }
-            catch (DbUpdateException)
+            catch (DbUpdateConcurrencyException)
             {
                 return Conflict();
-            }
-
-            static async ValueTask<T> TryConcurrentUpdateAsync<T>(int retryCount, int interval, Func<Task<T>> asyncFunc)
-            {
-                try
-                {
-                    return await asyncFunc();
-                }
-                catch(DbUpdateException)
-                {
-                    if (retryCount == 0)
-                        throw;  //we reach the maximum try, let's give up
-
-                    var intervalRandomnessValue = random.Next(-interval / 2, (int)(interval * 1.5));
-                    await Task.Delay(interval + intervalRandomnessValue); //Delay before we try again
-                    return await TryConcurrentUpdateAsync(retryCount - 1, (int)(interval * 1.25), asyncFunc); //Let's try again with a longer delay
-                }
             }
 
             async Task<T> UseRowLockTransactionAsync<T>(Func<Task<T>> dbCommand)
@@ -83,7 +64,7 @@ namespace CocurentTransaction.Controllers
                 return dbResult;
             }
 
-            async Task<decimal> RechargeCoreAsync()
+            async Task<decimal> RechargeCoreAsync(bool retry = false)
             {
                 var wallet = await walletContext.Wallets
                     .AsNoTracking()
@@ -97,13 +78,19 @@ namespace CocurentTransaction.Controllers
 
                 var entityEntry = walletContext.Wallets.Update(rechargedWallet);
 
-                //await walletContext.SaveChangesAsync();
-                await SaveChangesWithConflitHandlerAsync();
+                var _ = retry
+                    ? // Save changes with concurrency conflicts handle and retry
+                      await RetryAsync<int, DbUpdateConcurrencyException>(
+                        5,
+                        10,
+                        () => walletContext.SaveChangesAsync(),
+                        static ex => HandleConcurrencyConflicts(ex.Entries))
+                    : await walletContext.SaveChangesAsync();
 
                 return entityEntry.Entity.Balance;
             }
 
-            void HandleUpdateConcurrencyUpdate(IEnumerable<EntityEntry> entries)
+            static void HandleConcurrencyConflicts(IEnumerable<EntityEntry> entries)
             {
                 //Code from https://docs.microsoft.com/en-us/ef/core/saving/concurrency
                 foreach (var entry in entries)
@@ -129,20 +116,6 @@ namespace CocurentTransaction.Controllers
                             "Don't know how to handle concurrency conflicts for "
                             + entry.Metadata.Name);
                     }
-                }
-            }
-
-            async Task<int> SaveChangesWithConflitHandlerAsync()
-            {
-                try
-                {
-                    return await walletContext.SaveChangesAsync();
-                }
-                catch (DbUpdateException ex)
-                {
-                    HandleUpdateConcurrencyUpdate(ex.Entries);
-
-                    return await walletContext.SaveChangesAsync();
                 }
             }
         }
