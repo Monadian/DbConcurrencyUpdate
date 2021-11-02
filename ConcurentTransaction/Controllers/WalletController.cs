@@ -16,7 +16,6 @@ namespace CocurentTransaction.Controllers
     public class WalletController : ControllerBase
     {
         private readonly WalletContext walletContext;
-        
 
         public WalletController(WalletContext walletContext)
         {

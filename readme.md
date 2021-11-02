@@ -16,7 +16,12 @@
    - Use C#'s lock statement (be careful when running on multiple processes you will need distributed lock)
    - Use C#'s semaphore (same with C# lock statement with async support)
 
-4. Implement eventual consistency (no EF, micro-service approach)
+4. Use message queue (publish-subscribe)  
+   Put all incoming request to some queues (maybe partition by hash of user id)  
+   then have some services to subscribe on each partition
+   - RabbitMQ will be a good start here
+
+5. Implement eventual consistency (no EF, micro-service approach)
    - Event Sourcing (Use marten for this)
    - Event Streaming (Kafka)
 
