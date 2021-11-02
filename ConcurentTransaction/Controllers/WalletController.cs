@@ -46,18 +46,18 @@ namespace CocurentTransaction.Controllers
                 return Conflict();
             }
 
-            async Task<T> UseRowLockTransactionAsync<T>(Func<Task<T>> dbCommand)
+            async Task<T> UseRowLockTransactionAsync<T>(Func<Task<T>> dbCommandAsync)
             {
-                //The default exclusive lock is not enough to deal with concurrency update
-                //Other transaction can still read the same value
+                // The default exclusive lock is not enough to deal with concurrency update
+                // Other transaction can still access the same row
                 using var tx = walletContext.Database.BeginTransaction();
 
-                //If you really want to deal with concurency with lock, use DB specific row-lock commnad
-                //We are use SQLServer here
+                // If you really want to deal with concurency with lock, use DB specific row-lock commnad
+                // We are use SQLServer here
                 await walletContext.Database.ExecuteSqlRawAsync(
                     $"SELECT * FROM Wallets WITH (UPDLOCK) WHERE UserId = '{userId}'");
 
-                var dbResult = await dbCommand();
+                var dbResult = await dbCommandAsync();
 
                 await tx.CommitAsync();
 
@@ -92,7 +92,7 @@ namespace CocurentTransaction.Controllers
 
             static void HandleConcurrencyConflicts(IEnumerable<EntityEntry> entries)
             {
-                //Code from https://docs.microsoft.com/en-us/ef/core/saving/concurrency
+                // Code from https://docs.microsoft.com/en-us/ef/core/saving/concurrency
                 foreach (var entry in entries)
                 {
                     if (entry.Entity is Wallet)
@@ -104,7 +104,7 @@ namespace CocurentTransaction.Controllers
                         var proposedAmount = (decimal)proposedValues["Amount"];
                         var databaseBalance = (decimal)databaseValues["Balance"];
 
-                        //Add current balance with proposed amount again
+                        // Add current balance with proposed amount again
                         proposedValues["Balance"] = databaseBalance + proposedAmount;
 
                         // Refresh original values to bypass next concurrency check

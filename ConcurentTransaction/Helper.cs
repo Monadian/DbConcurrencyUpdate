@@ -6,8 +6,8 @@ namespace ConcurentTransaction
     public static class Helper
     {
         private static readonly Random random = new();
-        private static int MaximumRetryDelay { get; set; } = 500;
-        private static float RetryDelayMultiplier { get; set; } = 2;
+        public static int MaximumRetryDelay { get; set; } = 500;
+        public static float RetryDelayMultiplier { get; set; } = 2;
 
         public static async Task<T> RetryAsync<T, TException>(
                 int retryLimit,
