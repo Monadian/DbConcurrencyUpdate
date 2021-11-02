@@ -30,16 +30,16 @@ namespace CocurentTransaction.Controllers
             {
                 // 1. Let's try to update record with optimisic concurrency check to avoid performance penalty and deadlock
                 // this line check for concurrency update and do conflict handle without retry
-                var newBalanceType1 = await RechargeCoreAsync();
+                //var newBalanceType1 = await RechargeCoreAsync();
 
                 // 2. Same as (1) but with retry
                 // We try to update for 5 times (with delay), if it still conflicted just admit it.
                 //var newBalanceType2 = await RechargeCoreAsync(true);
 
                 // 3. Use DB row-lock
-                //var newBalanceType3 = await UseRowLockTransactionAsync(() => RechargeCoreAsync());
+                var newBalanceType3 = await UseRowLockTransactionAsync(() => RechargeCoreAsync());
 
-                return Ok(newBalanceType1);
+                return Ok(newBalanceType3);
             }
             catch (DbUpdateConcurrencyException)
             {
@@ -48,12 +48,14 @@ namespace CocurentTransaction.Controllers
 
             async Task<T> UseRowLockTransactionAsync<T>(Func<Task<T>> dbCommandAsync)
             {
-                // The default exclusive lock is not enough to deal with concurrency update
+                // The default serializable level is not enough to deal with concurrency update
                 // Other transaction can still access the same row
-                using var tx = walletContext.Database.BeginTransaction();
+                using var tx = await walletContext.Database.BeginTransactionAsync();
 
                 // If you really want to deal with concurency with lock, use DB specific row-lock commnad
-                // We are use SQLServer here
+                // We are use SQLServer here.
+                // Using UPDLOCK to Avoid a SQL Server Deadlock
+                // https://www.mssqltips.com/sqlservertip/6290/sql-server-update-lock-and-updlock-table-hints/
                 await walletContext.Database.ExecuteSqlRawAsync(
                     $"SELECT * FROM Wallets WITH (UPDLOCK) WHERE UserId = '{userId}'");
 
