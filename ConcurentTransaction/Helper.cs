@@ -13,7 +13,7 @@ namespace ConcurentTransaction
                 int retryLimit,
                 int millisecondsDelay,
                 Func<Task<T>> funcAsync,
-                Action<TException> exceptionHandler)
+                Func<TException, bool> exceptionHandler)
                 where TException : Exception
         {
             try
@@ -25,7 +25,9 @@ namespace ConcurentTransaction
                 if (retryLimit < 0)
                     throw;  // we reach the maximum try, let's give up
 
-                exceptionHandler(ex);
+                //Should we retry again?
+                if (!exceptionHandler(ex))
+                    throw;
 
                 var intervalRandomnessValue = random.Next(-millisecondsDelay, millisecondsDelay);
                 await Task.Delay(millisecondsDelay + intervalRandomnessValue); // Delay before we try again

@@ -2,6 +2,7 @@
 using CocurentTransaction.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using System;
@@ -36,7 +37,12 @@ namespace CocurentTransaction.Controllers
                 //var newBalanceType2 = await RechargeCoreAsync(true);
 
                 // 3. Use DB row-lock
-                var newBalanceType3 = await UseRowLockTransactionAsync(() => RechargeCoreAsync());
+                var newBalanceType3 = await RetryAsync<decimal, SqlException>(
+                    5,
+                    10,
+                    () => UseRowLockTransactionAsync(() => RechargeCoreAsync()),
+                    // https://docs.microsoft.com/en-us/sql/relational-databases/errors-events/mssqlserver-1205-database-engine-error?view=sql-server-ver15
+                    ex => ex.Number == 1205);
 
                 return Ok(newBalanceType3);
             }
@@ -91,7 +97,7 @@ namespace CocurentTransaction.Controllers
                 return entityEntry.Entity.Balance;
             }
 
-            static void HandleConcurrencyConflicts(IEnumerable<EntityEntry> entries)
+            static bool HandleConcurrencyConflicts(IEnumerable<EntityEntry> entries)
             {
                 // Code from https://docs.microsoft.com/en-us/ef/core/saving/concurrency
                 foreach (var entry in entries)
@@ -118,6 +124,8 @@ namespace CocurentTransaction.Controllers
                             + entry.Metadata.Name);
                     }
                 }
+
+                return true;
             }
         }
     }
