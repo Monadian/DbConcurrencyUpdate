@@ -36,7 +36,10 @@ namespace CocurentTransaction
             });
 
             var connectionString = "Server=localhost; Database=wallet; User Id = sa; Password = Abc123456;";
-            services.AddDbContext<WalletContext>(options => options.UseSqlServer(connectionString));
+            //services.AddDbContext<WalletContext>(options => options.UseSqlServer(connectionString));
+
+            // https://docs.microsoft.com/en-us/ef/core/performance/advanced-performance-topics?tabs=with-di%2Cwith-constant#dbcontext-pooling
+            services.AddDbContextPool<WalletContext>(options => options.UseSqlServer(connectionString));
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
