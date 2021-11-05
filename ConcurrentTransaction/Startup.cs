@@ -13,6 +13,10 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using CocurentTransaction.Db;
+using MassTransit;
+using ConcurrentTransaction.Consumers;
+using ConcurrentTransaction.Models.Messages;
+using GreenPipes;
 
 namespace CocurentTransaction
 {
@@ -40,6 +44,37 @@ namespace CocurentTransaction
 
             // https://docs.microsoft.com/en-us/ef/core/performance/advanced-performance-topics?tabs=with-di%2Cwith-constant#dbcontext-pooling
             services.AddDbContextPool<WalletContext>(options => options.UseSqlServer(connectionString));
+
+            services.AddMassTransit(x =>
+            {
+                x.AddConsumer<RechargeWalletConsumer>();
+
+                x.UsingRabbitMq((ctx, cfg) =>
+                {
+                    cfg.Host("localhost", "/", h =>
+                    {
+                        h.Username("guest");
+                        h.Password("guest");
+                    });
+
+                    cfg.ReceiveEndpoint("recharge-wallet-listener", e =>
+                    {
+                        e.ConcurrentMessageLimit = 2;
+                        e.UseMessageRetry(r => r.Interval(2, 100));
+                        e.Consumer<RechargeWalletConsumer>(ctx);
+                    });
+                });
+
+                // For testing without RabbitMQ
+                //x.UsingInMemory((context, cfg) =>
+                //{
+                //    cfg.ConfigureEndpoints(context);
+                //});
+
+                x.AddRequestClient<RechargeWallet>();
+            });
+
+            services.AddMassTransitHostedService();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.

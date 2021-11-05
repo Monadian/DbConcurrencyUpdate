@@ -29,17 +29,25 @@ namespace ConcurentTransaction
                 if (!exceptionHandler(ex))
                     throw;
 
-                var intervalRandomnessValue = random.Next(-millisecondsDelay, millisecondsDelay);
-                await Task.Delay(millisecondsDelay + intervalRandomnessValue); // Delay before we try again
-
-                var newDelay = (int)(millisecondsDelay * RetryDelayMultiplier);
+                var newDelay = millisecondsDelay > 0
+                    ? await DelayAsync()
+                    : 0;
 
                 // Let's try again with a longer delay
                 return await RetryAsync(
                     retryLimit - 1,
-                    newDelay > MaximumRetryDelay ? MaximumRetryDelay : newDelay,
+                    newDelay,
                     funcAsync,
                     exceptionHandler);
+
+                async ValueTask<int> DelayAsync()
+                {
+                    var intervalRandomnessValue = random.Next(-millisecondsDelay, millisecondsDelay);
+                    await Task.Delay(millisecondsDelay + intervalRandomnessValue); // Delay before we try again
+                    var nextDelay = (int)(millisecondsDelay * RetryDelayMultiplier);
+
+                    return nextDelay > MaximumRetryDelay ? MaximumRetryDelay : nextDelay;
+                }
             }
         }
     }

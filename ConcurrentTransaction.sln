@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.31825.309
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ConcurentTransaction", "ConcurentTransaction\ConcurentTransaction.csproj", "{8B9E6076-D26C-498F-9962-2267EE9D7201}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ConcurrentTransaction", "ConcurrentTransaction\ConcurrentTransaction.csproj", "{8B9E6076-D26C-498F-9962-2267EE9D7201}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

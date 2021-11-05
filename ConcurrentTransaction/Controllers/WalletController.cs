@@ -1,5 +1,7 @@
 ﻿using CocurentTransaction.Db;
 using CocurentTransaction.Models;
+using ConcurrentTransaction.Models.Messages;
+using MassTransit;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
@@ -17,10 +19,14 @@ namespace CocurentTransaction.Controllers
     public class WalletController : ControllerBase
     {
         private readonly WalletContext walletContext;
+        private readonly IRequestClient<RechargeWallet> client;
 
-        public WalletController(WalletContext walletContext)
+        public WalletController(
+            WalletContext walletContext,
+            IRequestClient<RechargeWallet> client)
         {
             this.walletContext = walletContext;
+            this.client = client;
         }
 
         [HttpPost("recharge/{userId}")]
@@ -37,14 +43,23 @@ namespace CocurentTransaction.Controllers
                 //var newBalanceType2 = await RechargeCoreAsync(true);
 
                 // 3. Use DB row-lock
-                var newBalanceType3 = await RetryAsync<decimal, SqlException>(
-                    5,
-                    10,
-                    () => UseRowLockTransactionAsync(() => RechargeCoreAsync()),
-                    // https://docs.microsoft.com/en-us/sql/relational-databases/errors-events/mssqlserver-1205-database-engine-error?view=sql-server-ver15
-                    ex => ex.Number == 1205);
+                //var newBalanceType3 = await RetryAsync<decimal, SqlException>(
+                //    5,
+                //    10,
+                //    () => UseRowLockTransactionAsync(() => RechargeCoreAsync()),
+                //    // https://docs.microsoft.com/en-us/sql/relational-databases/errors-events/mssqlserver-1205-database-engine-error?view=sql-server-ver15
+                //    ex => ex.Number == 1205);
 
-                return Ok(newBalanceType3);
+                // 4. MassTransit with RabbitMQ
+                var response = await client.GetResponse<RechargeWalletResult>(
+                    new 
+                    { 
+                        UserId = userId,
+                        Amount = model.Amount,
+                    });
+                var newBalanceType4 = response.Message.Balance;
+
+                return Ok(newBalanceType4);
             }
             catch (DbUpdateConcurrencyException)
             {
